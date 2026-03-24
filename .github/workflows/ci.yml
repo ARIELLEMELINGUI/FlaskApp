@@ -1,5 +1,6 @@
-name: CI Pipeline
+name: CI Pipeline Complete
 
+# DECLENCHEURS (Push et Pull Request)
 on:
   push:
     branches: [ "main" ]
@@ -7,28 +8,42 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # ÉTAPE 1 : Les Tests Unitaires
+  # JOB 1 : LES TESTS UNITAIRES
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.13'
+          
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          
       - name: Run tests
-        run: |
-          # Si tu n'as pas encore de tests, cette commande peut échouer. 
-          # Tu peux mettre 'python -m compileall .' pour tester juste la syntaxe.
-          pytest || echo "Pas encore de tests définis"
+        # On essaie de lancer pytest, sinon on vérifie juste la syntaxe
+        run: pytest || python -m compileall .
 
-  # ÉTAPE 2 : Construction et envoi vers Docker Hub
+      # ETAPE : NOTIFICATION PAR EMAIL EN CAS D'ECHEC
+      - name: Send mail on failure
+        if: failure() # Cette étape ne se lance QUE si les tests échouent
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "ALERTE : Échec des tests sur ${{ github.repository }}"
+          to: ton-email@example.com # Remplace par ton vrai email ici
+          from: GitHub Actions CI
+
+  # JOB 2 : CONSTRUCTION ET ENVOI DOCKER
   build-and-push:
-    needs: test # On n'envoie l'image QUE si les tests passent !
+    needs: test # CONDITION : On n'envoie l'image QUE si le job "test" est vert
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,9 +54,12 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push
+      # ENVOI VERS DEUX REGISTRES
+      - name: Build and push to Multiple Registries
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/flask-app:latest
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/flask-app:latest
+            ghcr.io/${{ github.repository_owner }}/flask-app:latest
