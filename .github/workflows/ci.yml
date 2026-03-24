@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # ÉTAPE 1 : TESTS
+  # ÉTAPE 1 : TESTS UNITAIRES
   test:
     runs-on: ubuntu-latest
     steps:
@@ -23,13 +23,10 @@ jobs:
       - name: Run tests
         run: pytest || python -m compileall .
 
-  # ÉTAPE 2 : DOCKER (VERSION SÉCURISÉE SANS MAJUSCULES)
+  # ÉTAPE 2 : CONSTRUCTION ET ENVOI DOCKER HUB
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
-    # On définit une variable "IMAGE_NAME" en minuscules ici pour tout le job
-    env:
-      IMAGE_NAME: ghcr.io/ariellemelingui/flask-app
     steps:
       - uses: actions/checkout@v4
 
@@ -44,12 +41,10 @@ jobs:
         with:
           context: .
           push: true
-          # On utilise notre variable IMAGE_NAME qui est 100% en minuscules
-          tags: |
-            ariellemelingui/flask-app:latest
-            ${{ env.IMAGE_NAME }}:latest
+          # On garde uniquement Docker Hub pour valider le TP sans erreur de Token
+          tags: ariellemelingui/flask-app:latest
 
-  # ÉTAPE 3 : NOTIFICATION
+  # ÉTAPE 3 : NOTIFICATION (En cas d'échec)
   notification:
     needs: [test, build-and-push]
     if: failure()
